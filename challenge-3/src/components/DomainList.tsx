@@ -1,33 +1,34 @@
 import React from 'react';
-import { VStack, HStack, Text, Button, Badge } from '@chakra-ui/react';
+import { VStack, HStack, Text, IconButton, Badge, Box, useDisclosure } from '@chakra-ui/react';
+import { DeleteIcon, EditIcon } from '@chakra-ui/icons';
+import { useConfirmationDialog } from './useConfirmationDialog';
+import { EditDomainDialog } from './EditDomainDialog';
+import { DomainInfo } from '../types';
 
-/**
- * Represents information about a domain in the cart.
- */
-interface DomainInfo {
-  name: string;
-  available: boolean;
-}
-
-/**
- * Props for the DomainList component.
- */
 interface DomainListProps {
   domains: DomainInfo[];
   onRemoveDomain: (domain: string) => void;
+  onEditDomain: (oldDomain: string, newDomain: string) => void;
 }
 
-/**
- * DomainList component
- * Displays a list of domains in the shopping cart, showing their availability status
- * and providing an option to remove each domain.
- * 
- * @param {Object} props - Component props
- * @param {DomainInfo[]} props.domains - Array of domain objects in the cart
- * @param {(domain: string) => void} props.onRemoveDomain - Callback function to remove a domain from the cart
- * @returns {React.ReactElement} The rendered DomainList component
- */
-export const DomainList: React.FC<DomainListProps> = ({ domains, onRemoveDomain }) => {
+export const DomainList: React.FC<DomainListProps> = ({ domains, onRemoveDomain, onEditDomain }) => {
+  const { openConfirmationDialog, ConfirmationDialogComponent } = useConfirmationDialog();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [editingDomain, setEditingDomain] = React.useState<DomainInfo | null>(null);
+
+  const handleRemoveDomain = (domainName: string) => {
+    openConfirmationDialog(
+      "Remove Domain",
+      `Are you sure you want to remove ${domainName} from your cart?`,
+      () => onRemoveDomain(domainName)
+    );
+  };
+
+  const handleEditDomain = (domain: DomainInfo) => {
+    setEditingDomain(domain);
+    onOpen();
+  };
+
   if (domains.length === 0) {
     return <Text>No domains in cart. Add some domains above!</Text>;
   }
@@ -35,18 +36,39 @@ export const DomainList: React.FC<DomainListProps> = ({ domains, onRemoveDomain 
   return (
     <VStack align="stretch" spacing={2}>
       {domains.map((domain) => (
-        <HStack key={domain.name} justifyContent="space-between">
-          <Text>{domain.name}</Text>
-          <HStack>
-            <Badge colorScheme={domain.available ? "green" : "red"}>
-              {domain.available ? "Available" : "Unavailable"}
-            </Badge>
-            <Button size="sm" onClick={() => onRemoveDomain(domain.name)}>
-              Remove
-            </Button>
+        <Box key={domain.name} borderWidth="1px" borderRadius="lg" p={3}>
+          <HStack justifyContent="space-between">
+            <Text>{domain.name}</Text>
+            <HStack>
+              <Badge colorScheme={domain.available ? "green" : "red"}>
+                {domain.available ? "Available" : "Unavailable"}
+              </Badge>
+              <IconButton
+                aria-label="Edit domain"
+                icon={<EditIcon />}
+                size="sm"
+                onClick={() => handleEditDomain(domain)}
+              />
+              <IconButton
+                aria-label="Remove domain"
+                icon={<DeleteIcon />}
+                size="sm"
+                colorScheme="red"
+                onClick={() => handleRemoveDomain(domain.name)}
+              />
+            </HStack>
           </HStack>
-        </HStack>
+        </Box>
       ))}
+      <ConfirmationDialogComponent />
+      {editingDomain && (
+        <EditDomainDialog
+          isOpen={isOpen}
+          onClose={onClose}
+          domain={editingDomain}
+          onEditDomain={onEditDomain}
+        />
+      )}
     </VStack>
   );
 };

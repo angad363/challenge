@@ -6,11 +6,14 @@ import { DomainList } from './DomainList';
 import { CartFullnessIndicator } from './CartFullnessIndicator';
 import { PurchaseButton } from './PurchaseButton';
 import { ActionButtons } from './ActionButtons';
+import { useConfirmationDialog } from './useConfirmationDialog';
+import { DomainInfo } from '../types';
+import { checkDomainAvailability } from './EditDomainDialog';
 
-interface DomainInfo {
-  name: string;
-  available: boolean;
-}
+// interface DomainInfo {
+//   name: string;
+//   available: boolean;
+// }
 
 interface DomainShoppingCartProps {
   numDomainsRequired: number;
@@ -20,7 +23,7 @@ interface DomainShoppingCartProps {
  * DomainShoppingCart component
  * Manages the main functionality of the domain shopping cart, including adding/removing domains,
  * checking cart fullness, and performing actions like purchase, clear, and keep best domains.
- * 
+ *
  * @param {Object} props - Component props
  * @param {number} props.numDomainsRequired - The number of domains required to complete the purchase
  * @returns {React.ReactElement} The rendered DomainShoppingCart component
@@ -29,17 +32,30 @@ interface DomainShoppingCartProps {
 export const DomainShoppingCart: React.FC<DomainShoppingCartProps> = ({ numDomainsRequired }) => {
   const [domains, setDomains] = useState<Set<DomainInfo>>(Set());
   const toast = useToast();
+  const { openConfirmationDialog, ConfirmationDialogComponent } = useConfirmationDialog();
 
   /**
  * Adds a new domain to the cart
- * 
+ *
  * @param {string} domain - The domain name to add
  * @param {boolean} available - Whether the domain is available for purchase
  */
 
   const handleAddDomain = useCallback((domain: string, available: boolean) => {
-    setDomains(prevDomains => prevDomains.add({ name: domain, available }));
-  }, []);
+    setDomains(prevDomains => {
+      const newDomains = prevDomains.add({ name: domain, available });
+      if (newDomains.size === numDomainsRequired) {
+        toast({
+          title: "Cart is full",
+          description: `You've added ${numDomainsRequired} domains to your cart.`,
+          status: "info",
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+      return newDomains;
+    });
+  }, [numDomainsRequired, toast]);
 
   const handleRemoveDomain = useCallback((domainName: string) => {
     setDomains(prevDomains => prevDomains.filter(d => d.name !== domainName));
@@ -50,13 +66,49 @@ export const DomainShoppingCart: React.FC<DomainShoppingCartProps> = ({ numDomai
   const handlePurchase = useCallback(() => {
     console.log('Purchasing domains:', domains.toArray());
     setDomains(Set());
-  }, [domains]);
+    toast({
+      title: "Purchase successful",
+      description: "Your payment has been processed.",
+      status: "success",
+      duration: 3000,
+      isClosable: true,
+    });
+  }, [domains, toast]);
 
-  const clearCart = useCallback(() => setDomains(Set()), []);
+  const clearCart = useCallback(() => {
+    openConfirmationDialog(
+      "Clear Cart",
+      "Are you sure you want to clear your cart? This action cannot be undone.",
+      () => {
+        setDomains(Set());
+        toast({
+          title: "Cart cleared",
+          description: "All domains have been removed from your cart.",
+          status: "info",
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    );
+  }, [openConfirmationDialog, toast]);
+
 
   const removeUnavailableDomains = useCallback(() => {
-    setDomains(prevDomains => prevDomains.filter(d => d.available));
-  }, []);
+    openConfirmationDialog(
+      "Remove Unavailable Domains",
+      "Are you sure you want to remove all unavailable domains from your cart?",
+      () => {
+        setDomains(prevDomains => prevDomains.filter(d => d.available));
+        toast({
+          title: "Unavailable domains removed",
+          description: "All unavailable domains have been removed from your cart.",
+          status: "info",
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    );
+  }, [openConfirmationDialog, toast]);
 
   const copyDomainsToClipboard = useCallback(() => {
     const domainList = domains.map(d => d.name).join(', ');
@@ -72,33 +124,77 @@ export const DomainShoppingCart: React.FC<DomainShoppingCartProps> = ({ numDomai
  */
 
   const keepBestDomains = useCallback(() => {
-    const sortedDomains = domains.toArray().sort((a, b) => {
-      const getScore = (domain: string) => domain.endsWith('.com') ? 3 : domain.endsWith('.app') ? 2 : 1;
-      const scoreA = getScore(a.name), scoreB = getScore(b.name);
-      return scoreB - scoreA || a.name.length - b.name.length;
-    });
-    setDomains(Set(sortedDomains.slice(0, numDomainsRequired)));
-  }, [domains, numDomainsRequired]);
+    openConfirmationDialog(
+      "Keep Best Domains",
+      "Are you sure you want to keep only the best domains? This will remove other domains from your cart.",
+      () => {
+        const sortedDomains = domains.toArray().sort((a, b) => {
+          const getScore = (domain: string) => domain.endsWith('.com') ? 3 : domain.endsWith('.app') ? 2 : 1;
+          const scoreA = getScore(a.name), scoreB = getScore(b.name);
+          return scoreB - scoreA || a.name.length - b.name.length;
+        });
+        setDomains(Set(sortedDomains.slice(0, numDomainsRequired)));
+        toast({
+          title: "Best domains kept",
+          description: "Your cart has been updated with the best domains.",
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    );
+  }, [domains, numDomainsRequired, openConfirmationDialog, toast]);
+
+  const handleEditDomain = useCallback(async (oldDomain: string, newDomain: string) => {
+    try {
+      const available = await checkDomainAvailability(newDomain);
+      setDomains(prevDomains => {
+        const domainToEdit = prevDomains.find(d => d.name === oldDomain);
+        if (!domainToEdit) return prevDomains;
+
+        const updatedDomain = { name: newDomain, available };
+        return prevDomains.delete(domainToEdit).add(updatedDomain);
+      });
+      toast({
+        title: "Domain updated",
+        description: `${newDomain} has been updated in your cart (${available ? 'Available' : 'Unavailable'})`,
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Error updating domain:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update domain",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  }, [setDomains, toast]);
 
   return (
     <VStack spacing={4} align="stretch">
       <Text>Max Domains: {numDomainsRequired}</Text>
-      <DomainInput 
-        onAddDomain={handleAddDomain} 
+      <DomainInput
+        onAddDomain={handleAddDomain}
         existingDomains={domains.map(d => d.name).toArray()}
       />
-      <DomainList 
-        domains={domains.toArray()} 
+      <DomainList
+        domains={domains.toArray()}
         onRemoveDomain={handleRemoveDomain}
+        onEditDomain={handleEditDomain}
       />
       <CartFullnessIndicator currentSize={domains.size} requiredSize={numDomainsRequired} />
       <PurchaseButton canPurchase={canPurchase} onPurchase={handlePurchase} />
-      <ActionButtons 
+      <ActionButtons
         onClearCart={clearCart}
         onRemoveUnavailable={removeUnavailableDomains}
         onCopyToClipboard={copyDomainsToClipboard}
         onKeepBest={keepBestDomains}
       />
+      <ConfirmationDialogComponent />
     </VStack>
   );
 };

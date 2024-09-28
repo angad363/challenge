@@ -13,7 +13,7 @@ interface DomainAvailabilityResponse {
 /**
  * DomainInput component
  * Provides an input field for users to enter domain names and add them to the cart
- * 
+ *
  * @param {Object} props - Component props
  * @param {(domain: string, available: boolean) => void} props.onAddDomain - Callback function to add a domain to the cart
  * @param {string[]} props.existingDomains - Array of domain names already in the cart
@@ -101,10 +101,11 @@ export const DomainInput: React.FC<DomainInputProps> = ({ onAddDomain, existingD
         }}
         isDisabled={isChecking}
       />
-      <Button 
-        onClick={validateAndAddDomain} 
+      <Button
+        onClick={validateAndAddDomain}
         isLoading={isChecking}
         loadingText="Checking"
+        colorScheme="blue"
       >
         Add Domain
       </Button>

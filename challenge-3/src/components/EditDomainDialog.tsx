@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Modal,
   ModalOverlay,
@@ -46,6 +46,10 @@ export const EditDomainDialog: React.FC<EditDomainDialogProps> = ({
   const [editedDomain, setEditedDomain] = useState(domain.name);
   const [isLoading, setIsLoading] = useState(false);
   const toast = useToast();
+
+  useEffect(() => {
+    setEditedDomain(domain.name);
+  }, [domain.name]);
 
   const handleEdit = async () => {
     if (editedDomain === domain.name) {

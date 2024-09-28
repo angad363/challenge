@@ -62,12 +62,15 @@ export const DomainList: React.FC<DomainListProps> = ({ domains, onRemoveDomain,
       ))}
       <ConfirmationDialogComponent />
       {editingDomain && (
-        <EditDomainDialog
-          isOpen={isOpen}
-          onClose={onClose}
-          domain={editingDomain}
-          onEditDomain={onEditDomain}
-        />
+      <EditDomainDialog
+        isOpen={isOpen}
+        onClose={() => {
+          setEditingDomain(null);
+          onClose();
+        }}
+        domain={editingDomain}
+        onEditDomain={onEditDomain}
+      />
       )}
     </VStack>
   );
